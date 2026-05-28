@@ -1,0 +1,34 @@
+multitenancy_enabled: false
+
+server:
+  http_listen_port: 9009
+  log_level: info
+
+distributor:
+  ring:
+    kvstore:
+      store: inmemory
+
+ingester:
+  ring:
+    kvstore:
+      store: inmemory
+    final_sleep: 0s
+
+blocks_storage:
+  backend: filesystem
+  filesystem:
+    dir: /data/blocks
+
+compactor:
+  data_dir: /data/compactor
+  sharding_ring:
+    kvstore:
+      store: inmemory
+
+ruler:
+  rule_path: /data/rules
+
+alertmanager:
+  data_dir: /data/alertmanager
+

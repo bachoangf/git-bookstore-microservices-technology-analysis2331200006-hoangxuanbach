@@ -1,0 +1,292 @@
+version: "3.9"
+
+services:
+  api-gateway:
+    build: ./api-gateway
+    ports:
+      - "8000:8000"
+    environment:
+      - LOG_LEVEL=debug
+      - JWT_SECRET=devsecret
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4318
+      - OTEL_SERVICE_NAME=api-gateway
+    depends_on:
+      - user-service
+      - product-service
+      - order-service
+      - notification-service
+      - analytics-service
+      - otel-collector
+      # NOTE: do not depend on frontend to avoid a cycle
+    networks: [bookstore-net]
+
+  frontend:
+    build: ./frontend
+    ports:
+      - "3000:3000"
+    environment:
+      - API_BASE=http://localhost:8000
+    depends_on:
+      - api-gateway
+    networks: [bookstore-net]
+
+  user-service:
+    build: ./user-service
+    environment:
+      # Database Configuration
+      - MONGO_URL=mongodb://user-db:27017/bookstore
+      - MONGO_DB=bookstore
+      # Security
+      - JWT_SECRET=devsecret
+      # Observability
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4318
+      - OTEL_SERVICE_NAME=user-service
+    depends_on:
+      - user-db
+      - otel-collector
+    networks: [bookstore-net]
+
+  product-service:
+    build: ./product-service
+    environment:
+      # Database Configuration
+      - PGHOST=product-db
+      - PGUSER=postgres
+      - PGPASSWORD=postgres
+      - PGDATABASE=products
+      - PGPORT=5432
+      # Service Configuration
+      - PORT=8002
+      - GRPC_PORT=50051
+      # Security
+      - JWT_SECRET=devsecret
+      # Message Broker
+      - RABBITMQ_URL=amqp://message-broker:5672
+      # Observability
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4318
+      - OTEL_SERVICE_NAME=product-service
+    depends_on:
+      - product-db
+      - message-broker
+      - otel-collector
+    networks: [bookstore-net]
+
+  order-service:
+    build: ./order-service
+    environment:
+      # Database Configuration
+      - PGHOST=order-db
+      - PGUSER=postgres
+      - PGPASSWORD=postgres
+      - PGDATABASE=orders
+      - PGPORT=5432
+      # Service Configuration
+      - PORT=8003
+      # Security
+      - JWT_SECRET=devsecret
+      # Message Broker
+      - RABBITMQ_URL=amqp://message-broker:5672
+      # Product Service Integration
+      - PRODUCT_SERVICE_URL=http://product-service:8002
+      - PRODUCT_GRPC_URL=product-service:50051
+      - PRODUCT_TIMEOUT_ATTEMPTS=3
+      - PRODUCT_CIRCUIT_RESET_MS=30000
+      - PRODUCT_GRPC_TIMEOUT_MS=2000
+      # Observability
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4318
+      - OTEL_SERVICE_NAME=order-service
+    depends_on:
+      - order-db
+      - message-broker
+      - product-service
+      - otel-collector
+    networks: [bookstore-net]
+
+  notification-service:
+    build: ./notification-service
+    environment:
+      # Service Configuration
+      - PORT=8005
+      # Security
+      - JWT_SECRET=devsecret
+      # Message Broker
+      - RABBITMQ_URL=amqp://message-broker:5672
+      # Observability
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4318
+      - OTEL_SERVICE_NAME=notification-service
+    depends_on:
+      - message-broker
+      - otel-collector
+    networks: [bookstore-net]
+
+  # Datastores
+  user-db:
+    image: mongo:7
+    restart: unless-stopped
+    volumes:
+      - user-data:/data/db
+    networks: [bookstore-net]
+
+  product-db:
+    image: postgres:16
+    restart: unless-stopped
+    environment:
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=products
+    volumes:
+      - product-data:/var/lib/postgresql/data
+    networks: [bookstore-net]
+
+  order-db:
+    image: postgres:16
+    restart: unless-stopped
+    environment:
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=orders
+    volumes:
+      - order-data:/var/lib/postgresql/data
+    networks: [bookstore-net]
+  message-broker:
+    image: rabbitmq:3-management
+    restart: unless-stopped
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    networks: [bookstore-net]
+
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.5.0
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    networks: [bookstore-net]
+
+  kafka:
+    image: confluentinc/cp-kafka:7.5.0
+    depends_on:
+      - zookeeper
+    ports:
+      - "9092:9092"
+    environment:
+      # Kafka Configuration
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:29092,PLAINTEXT_HOST://localhost:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+    networks: [bookstore-net]
+
+  analytics-dashboard-service:
+    build: ./analytics-dashboard-service
+    ports:
+      - "8006:8006"
+    environment:
+      # Service Configuration
+      - PORT=8006
+      # Kafka Configuration
+      - KAFKA_BROKER=kafka:29092
+    depends_on:
+      - kafka
+    networks: [bookstore-net]
+
+  analytics-service:
+    build: ./analytics-service
+    environment:
+      # Service Configuration
+      - PORT=8007
+      # Kafka Configuration
+      - KAFKA_BROKER=kafka:29092
+      # Observability
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4318
+      - OTEL_SERVICE_NAME=analytics-service
+    depends_on:
+      - kafka
+      - otel-collector
+    networks: [bookstore-net]
+
+  # Observability stack
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:0.101.0
+    command: ["--config=/etc/otelcol/config.yaml"]
+    volumes:
+      - ./observability/otel-collector-config.yaml:/etc/otelcol/config.yaml:ro
+    ports:
+      - "4318:4318"
+    depends_on:
+      - tempo
+      - mimir
+    networks: [bookstore-net]
+
+  loki:
+    image: grafana/loki:2.9.4
+    command: ["-config.file=/etc/loki/config.yml"]
+    volumes:
+      - loki-data:/loki
+      - ./observability/loki-config.yml:/etc/loki/config.yml:ro
+    ports:
+      - "3100:3100"
+    networks: [bookstore-net]
+
+  tempo:
+    image: grafana/tempo:2.4.2
+    command: ["-config.file=/etc/tempo/config.yaml"]
+    volumes:
+      - tempo-data:/var/tempo
+      - ./observability/tempo-config.yaml:/etc/tempo/config.yaml:ro
+    ports:
+      - "3200:3200"
+      - "4317:4317"
+    networks: [bookstore-net]
+
+  mimir:
+    image: grafana/mimir:2.12.0
+    command:
+      - "-config.file=/etc/mimir/config.yml"
+      - "-target=all"
+      - "-ingester.ring.replication-factor=1"
+    volumes:
+      - mimir-data:/data
+      - ./observability/mimir-config.yml:/etc/mimir/config.yml:ro
+    ports:
+      - "9009:9009"
+    networks: [bookstore-net]
+
+  grafana:
+    image: grafana/grafana:11.0.0
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_SECURITY_ADMIN_USER=admin
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./observability/grafana-provisioning:/etc/grafana/provisioning:ro
+    ports:
+      - "3001:3000"
+    depends_on:
+      - loki
+      - tempo
+      - mimir
+    networks: [bookstore-net]
+
+  promtail:
+    image: grafana/promtail:3.0.0
+    command: ["-config.file=/etc/promtail/config.yml"]
+    volumes:
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ./observability/promtail-config.yml:/etc/promtail/config.yml:ro
+    depends_on:
+      - loki
+    networks: [bookstore-net]
+
+volumes:
+  user-data:
+  product-data:
+  order-data:
+  loki-data:
+  tempo-data:
+  mimir-data:
+  grafana-data:
+
+networks:
+  bookstore-net:

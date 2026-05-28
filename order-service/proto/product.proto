@@ -1,0 +1,34 @@
+/**
+ * Product Service Protocol Buffer Definition
+ * 
+ * This file defines the gRPC service interface for the Product Service.
+ * It is used by the Order Service to fetch product information via gRPC.
+ * 
+ * The service provides a single RPC method: GetProduct, which retrieves
+ * product details by ID.
+ */
+
+syntax = "proto3";
+
+package product;
+
+// Product Service gRPC interface
+// Used for inter-service communication between Order Service and Product Service
+service ProductService {
+  rpc GetProduct (GetProductRequest) returns (Product);
+}
+
+// Request message for GetProduct RPC
+message GetProductRequest {
+  int32 id = 1;
+}
+
+// Product information response
+message Product {
+  int32 id = 1; 
+  string title = 2;
+  string author = 3; 
+  double price = 4;
+  int32 stock = 5;
+}
+

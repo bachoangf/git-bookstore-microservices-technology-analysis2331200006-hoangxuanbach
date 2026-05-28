@@ -1,0 +1,39 @@
+/**
+ * Order Service Protocol Buffer Definition
+ * 
+ * This file defines the gRPC service interface for the Order Service.
+ * It is used by the Product Service to delete orders associated with a product via gRPC.
+ * 
+ * The service provides a single RPC method: DeleteOrdersByProduct, which deletes
+ * all orders associated with a specific product ID.
+ */
+
+syntax = "proto3";
+
+package order;
+
+// Order Service gRPC interface
+// Used for inter-service communication between Product Service and Order Service
+service OrderService {
+  rpc DeleteOrdersByProduct (DeleteOrdersByProductRequest) returns (DeleteOrdersByProductResponse);
+}
+
+// Request message for DeleteOrdersByProduct RPC
+message DeleteOrdersByProductRequest {
+  int32 product_id = 1;
+}
+
+// Response message for DeleteOrdersByProduct RPC
+message DeleteOrdersByProductResponse {
+  int32 count = 1;  // Number of orders deleted
+  repeated Order orders = 2;  // List of deleted orders
+}
+
+// Order information
+message Order {
+  int32 id = 1;
+  int32 product_id = 2;
+  int32 quantity = 3;
+  string status = 4;
+}
+

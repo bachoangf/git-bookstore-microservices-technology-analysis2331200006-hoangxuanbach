@@ -1,0 +1,1336 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Bookstore API Gateway",
+    "version": "1.0.0",
+    "description": "Centralized entry point for the Bookstore microservices platform. This gateway proxies requests to the user, product, order, notification, analytics, and analytics-dashboard services while enforcing authentication and aggregating observability."
+  },
+  "servers": [
+    {
+      "url": "http://localhost:8000",
+      "description": "Local development"
+    }
+  ],
+  "tags": [
+    {
+      "name": "Gateway",
+      "description": "Gateway-level operational endpoints"
+    },
+    {
+      "name": "Users",
+      "description": "Authentication and profile operations"
+    },
+    {
+      "name": "Products",
+      "description": "Product catalog management"
+    },
+    {
+      "name": "Orders",
+      "description": "Customer order management"
+    },
+    {
+      "name": "Notifications",
+      "description": "Real-time and historical user notifications"
+    },
+    {
+      "name": "Analytics",
+      "description": "Event tracking APIs"
+    },
+    {
+      "name": "Analytics Dashboard",
+      "description": "Aggregated analytics reporting"
+    }
+  ],
+  "paths": {
+    "/healthz": {
+      "get": {
+        "tags": [
+          "Gateway"
+        ],
+        "summary": "Gateway health check",
+        "description": "Returns basic readiness information for the API gateway.",
+        "responses": {
+          "200": {
+            "description": "Gateway is healthy",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthStatus"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/openapi.json": {
+      "get": {
+        "tags": [
+          "Gateway"
+        ],
+        "summary": "Fetch OpenAPI definition",
+        "description": "Returns the OpenAPI 3 specification used to render this documentation.",
+        "responses": {
+          "200": {
+            "description": "OpenAPI document retrieved",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "OpenAPI document"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/users/register": {
+      "post": {
+        "tags": [
+          "Users"
+        ],
+        "summary": "Register a new user",
+        "description": "Creates a new user account and returns a JWT for immediate authentication.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RegisterRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "User registered successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RegisterResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "409": {
+            "description": "Username already exists",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
+    },
+    "/api/users/login": {
+      "post": {
+        "tags": [
+          "Users"
+        ],
+        "summary": "Authenticate via username/password",
+        "description": "Validates credentials and returns a signed JWT.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LoginRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Authentication successful",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthTokenResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
+    },
+    "/api/users/me": {
+      "get": {
+        "tags": [
+          "Users"
+        ],
+        "summary": "Fetch current user profile",
+        "description": "Returns the authenticated user's profile information.",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "User profile",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserProfile"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
+    },
+    "/api/products": {
+      "get": {
+        "tags": [
+          "Products"
+        ],
+        "summary": "List all products",
+        "description": "Returns the complete product catalog. Publicly accessible.",
+        "responses": {
+          "200": {
+            "description": "Product list",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Product"
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Products"
+        ],
+        "summary": "Create a new product",
+        "description": "Adds a new product to the catalog. Requires authentication.",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProductInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Product created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Product"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
+    },
+    "/api/products/{id}": {
+      "get": {
+        "tags": [
+          "Products"
+        ],
+        "summary": "Get product details",
+        "description": "Fetches detailed information about a single product. Publicly accessible.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "description": "Product identifier"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Product details",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Product"
+                }
+              }
+            }
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "Products"
+        ],
+        "summary": "Update an existing product",
+        "description": "Partially updates product fields. Requires authentication.",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "description": "Product identifier"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProductUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Updated product",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Product"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Products"
+        ],
+        "summary": "Delete a product",
+        "description": "Removes a product from the catalog. Requires authentication.",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "description": "Product identifier"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Deletion confirmation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "example": "Deleted"
+                    },
+                    "id": {
+                      "type": "integer"
+                    },
+                    "deletedOrdersCount": {
+                      "type": "integer",
+                      "description": "Number of associated orders removed via compensating transaction"
+                    }
+                  },
+                  "required": [
+                    "message",
+                    "id",
+                    "deletedOrdersCount"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
+    },
+    "/api/orders": {
+      "get": {
+        "tags": [
+          "Orders"
+        ],
+        "summary": "List orders",
+        "description": "Returns all orders in reverse chronological order. Requires authentication.",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Order list",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Order"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Orders"
+        ],
+        "summary": "Create a new order",
+        "description": "Creates an order after validating the product via gRPC. Requires authentication.",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OrderCreationRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Order created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrderCreationResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "503": {
+            "description": "Upstream product service unavailable or circuit open",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
+    },
+    "/api/orders/{id}": {
+      "get": {
+        "tags": [
+          "Orders"
+        ],
+        "summary": "Get order details",
+        "description": "Retrieves details for a single order by identifier. Requires authentication.",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "description": "Order identifier"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Order information",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Order"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
+    },
+    "/api/notifications": {
+      "get": {
+        "tags": [
+          "Notifications"
+        ],
+        "summary": "List notifications",
+        "description": "Returns all notifications for the authenticated user, sorted newest first.",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Notifications list",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Notification"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
+    },
+    "/api/notifications/seen": {
+      "post": {
+        "tags": [
+          "Notifications"
+        ],
+        "summary": "Mark all notifications as seen",
+        "description": "Marks every notification for the authenticated user as seen and returns the updated list.",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Updated notifications",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Notification"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
+    },
+    "/api/notifications/events": {
+      "get": {
+        "tags": [
+          "Notifications"
+        ],
+        "summary": "Subscribe to notification stream",
+        "description": "Opens a Server-Sent Events (SSE) stream that pushes real-time notifications for the authenticated user.",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "SSE stream started",
+            "content": {
+              "text/event-stream": {
+                "schema": {
+                  "type": "string",
+                  "description": "SSE-formatted stream of notification events",
+                  "example": "event: notification\\ndata: {\"title\":\"Order created\",\"body\":\"Order #42 is pending\"}\\n\\n"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        }
+      }
+    },
+    "/api/notifications/healthz": {
+      "get": {
+        "tags": [
+          "Notifications"
+        ],
+        "summary": "Notification service health",
+        "description": "Returns the health status of the notification service.",
+        "responses": {
+          "200": {
+            "description": "Service healthy",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthStatus"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/analytics/track": {
+      "post": {
+        "tags": [
+          "Analytics"
+        ],
+        "summary": "Track a user interaction",
+        "description": "Receives a user interaction event and publishes it to Kafka for downstream analytics processing. Publicly accessible for client-side instrumentation.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AnalyticsTrackRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Event accepted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AnalyticsAck"
+                }
+              }
+            }
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
+    },
+    "/api/analytics/healthz": {
+      "get": {
+        "tags": [
+          "Analytics"
+        ],
+        "summary": "Analytics service health",
+        "description": "Health probe for the analytics event-ingest service.",
+        "responses": {
+          "200": {
+            "description": "Service healthy",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthStatus"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/dashboard/health": {
+      "get": {
+        "tags": [
+          "Analytics Dashboard"
+        ],
+        "summary": "Dashboard service health",
+        "description": "Health probe for the analytics dashboard aggregation service.",
+        "responses": {
+          "200": {
+            "description": "Service healthy",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthStatus"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/dashboard/api/analytics": {
+      "get": {
+        "tags": [
+          "Analytics Dashboard"
+        ],
+        "summary": "Retrieve aggregated analytics",
+        "description": "Returns aggregated analytics including counts by button, user, and time buckets.",
+        "responses": {
+          "200": {
+            "description": "Analytics summary",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DashboardAnalyticsSummary"
+                }
+              }
+            }
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
+    },
+    "/api/dashboard/api/events": {
+      "get": {
+        "tags": [
+          "Analytics Dashboard"
+        ],
+        "summary": "List recent analytics events",
+        "description": "Returns the most recent tracked events used to populate the dashboard activity feed.",
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 50
+            },
+            "description": "Maximum number of events to return (defaults to 50)"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Recent events",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/DashboardEvent"
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "BearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT",
+        "description": "Supply the JWT issued by the user-service in the format `Bearer <token>`."
+      }
+    },
+    "schemas": {
+      "HealthStatus": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "example": "ok"
+          }
+        },
+        "required": [
+          "status"
+        ]
+      },
+      "ErrorResponse": {
+        "type": "object",
+        "properties": {
+          "error": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "error"
+        ]
+      },
+      "RegisterRequest": {
+        "type": "object",
+        "properties": {
+          "username": {
+            "type": "string",
+            "minLength": 3,
+            "example": "reader42"
+          },
+          "password": {
+            "type": "string",
+            "minLength": 6,
+            "example": "changeme"
+          }
+        },
+        "required": [
+          "username",
+          "password"
+        ]
+      },
+      "RegisterResponse": {
+        "type": "object",
+        "properties": {
+          "message": {
+            "type": "string",
+            "example": "User created"
+          },
+          "token": {
+            "type": "string",
+            "description": "Signed JWT for the new user"
+          }
+        },
+        "required": [
+          "message",
+          "token"
+        ]
+      },
+      "LoginRequest": {
+        "type": "object",
+        "properties": {
+          "username": {
+            "type": "string",
+            "example": "reader42"
+          },
+          "password": {
+            "type": "string",
+            "example": "changeme"
+          }
+        },
+        "required": [
+          "username",
+          "password"
+        ]
+      },
+      "AuthTokenResponse": {
+        "type": "object",
+        "properties": {
+          "token": {
+            "type": "string",
+            "description": "Signed JWT for subsequent requests"
+          }
+        },
+        "required": [
+          "token"
+        ]
+      },
+      "UserProfile": {
+        "type": "object",
+        "properties": {
+          "_id": {
+            "type": "string",
+            "description": "MongoDB identifier"
+          },
+          "username": {
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "_id",
+          "username",
+          "createdAt",
+          "updatedAt"
+        ]
+      },
+      "Product": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "example": 12
+          },
+          "title": {
+            "type": "string",
+            "example": "Clean Architecture"
+          },
+          "author": {
+            "type": "string",
+            "example": "Robert C. Martin"
+          },
+          "price": {
+            "type": "number",
+            "format": "float",
+            "example": 24.99
+          },
+          "stock": {
+            "type": "integer",
+            "example": 100
+          }
+        },
+        "required": [
+          "id",
+          "title",
+          "author",
+          "price",
+          "stock"
+        ]
+      },
+      "ProductInput": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string",
+            "example": "Domain-Driven Design"
+          },
+          "author": {
+            "type": "string",
+            "example": "Eric Evans"
+          },
+          "price": {
+            "type": "number",
+            "format": "float",
+            "example": 39.99
+          },
+          "stock": {
+            "type": "integer",
+            "example": 50
+          }
+        },
+        "required": [
+          "title",
+          "author"
+        ]
+      },
+      "ProductUpdate": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string"
+          },
+          "author": {
+            "type": "string"
+          },
+          "price": {
+            "type": "number",
+            "format": "float"
+          },
+          "stock": {
+            "type": "integer"
+          }
+        }
+      },
+      "Order": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "example": 42
+          },
+          "product_id": {
+            "type": "integer",
+            "example": 12
+          },
+          "quantity": {
+            "type": "integer",
+            "example": 2
+          },
+          "status": {
+            "type": "string",
+            "example": "PENDING"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "product_id",
+          "quantity",
+          "status",
+          "created_at"
+        ]
+      },
+      "OrderCreationRequest": {
+        "type": "object",
+        "properties": {
+          "productId": {
+            "type": "integer",
+            "minimum": 1,
+            "example": 12
+          },
+          "quantity": {
+            "type": "integer",
+            "minimum": 1,
+            "example": 1
+          }
+        },
+        "required": [
+          "productId"
+        ]
+      },
+      "OrderCreationResponse": {
+        "type": "object",
+        "properties": {
+          "message": {
+            "type": "string",
+            "example": "Order created"
+          },
+          "order": {
+            "$ref": "#/components/schemas/Order"
+          }
+        },
+        "required": [
+          "message",
+          "order"
+        ]
+      },
+      "Notification": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "title": {
+            "type": "string",
+            "example": "Order created"
+          },
+          "body": {
+            "type": "string",
+            "example": "Order #42 is pending"
+          },
+          "type": {
+            "type": "string",
+            "example": "info"
+          },
+          "metadata": {
+            "type": "object",
+            "additionalProperties": true
+          },
+          "seen": {
+            "type": "boolean",
+            "example": false
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "title",
+          "body",
+          "type",
+          "metadata",
+          "seen",
+          "createdAt"
+        ]
+      },
+      "AnalyticsTrackRequest": {
+        "type": "object",
+        "properties": {
+          "buttonId": {
+            "type": "string",
+            "example": "buy_now"
+          },
+          "userId": {
+            "type": "string",
+            "example": "user-123"
+          },
+          "metadata": {
+            "type": "object",
+            "additionalProperties": true,
+            "example": {
+              "page": "/products/12"
+            }
+          }
+        },
+        "required": [
+          "buttonId"
+        ]
+      },
+      "AnalyticsAck": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "example": true
+          },
+          "message": {
+            "type": "string",
+            "example": "Event tracked"
+          }
+        },
+        "required": [
+          "success",
+          "message"
+        ]
+      },
+      "DashboardAnalyticsSummary": {
+        "type": "object",
+        "properties": {
+          "totalClicks": {
+            "type": "integer",
+            "example": 128
+          },
+          "topButtons": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "buttonId": {
+                  "type": "string",
+                  "example": "buy_now"
+                },
+                "count": {
+                  "type": "integer",
+                  "example": 64
+                }
+              },
+              "required": [
+                "buttonId",
+                "count"
+              ]
+            }
+          },
+          "topUsers": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "userId": {
+                  "type": "string",
+                  "example": "user-123"
+                },
+                "count": {
+                  "type": "integer",
+                  "example": 12
+                }
+              },
+              "required": [
+                "userId",
+                "count"
+              ]
+            }
+          },
+          "clicksByTime": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "time": {
+                  "type": "string",
+                  "example": "Mon Jan 01 2024 15:00"
+                },
+                "count": {
+                  "type": "integer",
+                  "example": 7
+                }
+              },
+              "required": [
+                "time",
+                "count"
+              ]
+            }
+          },
+          "recentEvents": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DashboardEvent"
+            }
+          }
+        },
+        "required": [
+          "totalClicks",
+          "topButtons",
+          "topUsers",
+          "clicksByTime",
+          "recentEvents"
+        ]
+      },
+      "DashboardEvent": {
+        "type": "object",
+        "properties": {
+          "buttonId": {
+            "type": "string",
+            "example": "buy_now"
+          },
+          "userId": {
+            "type": "string",
+            "example": "user-123"
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "metadata": {
+            "type": "object",
+            "additionalProperties": true
+          }
+        },
+        "required": [
+          "buttonId",
+          "userId",
+          "timestamp",
+          "metadata"
+        ]
+      }
+    },
+    "responses": {
+      "BadRequest": {
+        "description": "Validation failed or malformed request",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorResponse"
+            }
+          }
+        }
+      },
+      "Unauthorized": {
+        "description": "Missing or invalid authentication token",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorResponse"
+            }
+          }
+        }
+      },
+      "NotFound": {
+        "description": "Requested resource not found",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorResponse"
+            }
+          }
+        }
+      },
+      "InternalError": {
+        "description": "Unexpected server error",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorResponse"
+            }
+          }
+        }
+      }
+    }
+  }
+}
+
